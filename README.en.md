@@ -16,7 +16,7 @@ A native macOS menu bar utility for managing your own Codex desktop accounts.
 - **See your active account's remaining usage** in the menu bar.
 - **Update in place** through the app's signed update channel.
 
-**Version 0.4.5:** An opaque native menu fixes transparent edges and improves readability. Manage Accounts reuses one window. Each account shows estimated usage observed today in your local time zone, or “—” until enough comparable samples are available. Existing accounts, settings and update URLs are preserved. The repository URL and legacy installer filenames remain unchanged for compatibility.
+**Version 0.4.6:** Opening the menu no longer activates the management app or forces a return from a full-screen Space. The management window now shows the same estimated daily usage as the menu, with its quota period identified and “—” when observations are insufficient. Existing accounts, settings and update URLs are preserved. The repository URL and legacy installer filenames remain unchanged for compatibility.
 
 ## Get started
 

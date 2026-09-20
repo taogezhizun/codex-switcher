@@ -119,3 +119,11 @@ GitHub CI passed for the 0.4.4 source commit, including tests, privacy checks, n
 The menu now uses one AppKit status item and an NSPopover hosting the same SwiftUI content used in production. Synthetic light/dark popovers were inspected for opaque backgrounds and complete edges. Filtering shrank the native popup; choosing an inactive synthetic account showed the compact switch confirmation. Repeated management actions reused the singleton accounts window; closing and reopening it retained the selected account. These checks do not access real credentials or perform a desktop switch.
 
 All 98 local tests passed with zero failures or skips, including the isolated signed-out official CLI test. Daily observation tests cover first-sample unknown values, zero usage, accumulation, persistence, midnight, time-zone changes, DST, quota resets/replenishment, independent windows, metadata changes, and invalid/out-of-order samples. AppModel tests query two synthetic saved accounts, verify independent persisted estimates and preserve history on failure, with zero Keychain reads.
+
+## 0.4.6 full-screen menu regression
+
+The 0.4.5 menu called application activation before showing the popover; this could pull the user back to the management window's Space. Opening the popup now avoids application activation and assigns full-screen/all-application collection behavior only to its own window. Management and Settings still activate when explicitly selected.
+
+A disposable separate AppKit fixture entered native full screen and invoked the same show path through a temporary demo-only trigger. After the menu opened, the fixture independently recorded fullScreen=true and isOnActiveSpace=true; the popup recorded isOnActiveSpace=true with the frontmost application unchanged. Search input and unknown daily-usage rendering were checked in the popup. The management window displayed the shared estimate and its quota-period description with synthetic data. Temporary triggers and diagnostics were removed before packaging; no real account data was accessed. This does not establish every multi-monitor or macOS-version combination.
+
+All 98 local tests passed, including the isolated signed-out official CLI test.

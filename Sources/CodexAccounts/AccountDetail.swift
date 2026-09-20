@@ -63,6 +63,16 @@ struct AccountDetail: View {
                             Button("读取额度") { model.refresh(account.id) }.disabled(!model.canRefresh(account.id))
                         }.frame(maxWidth: .infinity).padding(28).background(.background, in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(.quaternary))
                     } else {
+                        let daily = DailyUsagePresentation.make(account: account, now: model.quotaDisplayDate)
+                        HStack(spacing: 8) {
+                            Text(daily.text).font(.callout.weight(.medium)).monospacedDigit()
+                            if let quota = QuotaPresentation.summary(account.quotas) {
+                                Text("Codex \(QuotaPresentation.duration(quota))额度 · 本机估算")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }.help(daily.help)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityHint(daily.help)
                         QuotaGroupsView(windows: account.quotas)
                     }
                     if let issue = account.issue {

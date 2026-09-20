@@ -36,6 +36,7 @@ import SwiftUI
             }
         }
         renderLabel()
+
     }
 
     private func renderLabel() {
@@ -61,12 +62,14 @@ import SwiftUI
 
     func show() {
         guard let model, let button = statusItem?.button else { return }
-        NSApp.activate(ignoringOtherApps: true)
         if popover.isShown {
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
             return
         }
-        let host = NSHostingController(rootView: MenuPanel().environmentObject(model).environmentObject(self))
+        // Activating the application here can switch back to its management-window
+        // Space. Only the popover takes keyboard focus; explicit management and
+        // settings actions below still activate the application.
+        let host = MenuHostingController(rootView: MenuPanel().environmentObject(model).environmentObject(self))
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host
         renderLabel()
@@ -74,8 +77,8 @@ import SwiftUI
         popover.contentSize = host.view.fittingSize
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
-    }
 
+    }
 
     func openAccounts() {
         popover.performClose(nil)
@@ -87,5 +90,16 @@ import SwiftUI
         popover.performClose(nil)
         settingsAction()
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+private final class MenuHostingController<Content: View>: NSHostingController<Content> {
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        guard let window = view.window else { return }
+        // Apply to the popup window, never the management window. Preserve the
+        // native popover's transient/nonactivating behavior and dismissal rules.
+        window.collectionBehavior.subtract([.moveToActiveSpace, .fullScreenPrimary, .fullScreenNone, .primary, .auxiliary])
+        window.collectionBehavior.formUnion([.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications])
     }
 }
