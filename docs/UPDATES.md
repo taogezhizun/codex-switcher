@@ -1,10 +1,12 @@
-# Updates and refresh — 0.4.2
+# Updates and refresh — 0.4.3
 
 ## Branding compatibility
 
 Version 0.4.2 uses **Codex Switcher** as its display name in the app, installer title and release feed. The repository URL, bundle identifier, executable/target names, preferences domain, account directory, Keychain migration identifiers, public signing key, feed URLs and `Codex Accounts.app` archive root are unchanged. Stable `Codex-Accounts-macOS-*` asset names preserve existing download links. Keeping the archive root follows [Sparkle publishing guidance](https://sparkle-project.org/documentation/publishing/) and avoids requiring existing users to install a second app. The on-disk bundle filename can still show the old name.
 
 ## User behavior
+
+The compact menu quota row shows the remaining percentage and reset date/time in the system timezone. The progress bar follows below; plan, quota window, reset countdown and last query time are available on hover and through VoiceOver. Stale values retain an explicit cached label, and elapsed reset times do not imply that quota has already recovered.
 
 About credits the public maintainer account and links to the GitHub profile and project. No private name, email, account screenshot or developer-machine path is included.
 
@@ -41,7 +43,7 @@ After pushing, verify that GitHub associates the commit with the intended accoun
 1. Update the display version and increment `CFBundleVersion` in `resources/Info.plist`; keep the public signing key unchanged. Run tests and the privacy scan.
 2. Build both archives, using `ARCH=arm64 OUTPUT_DIR="$PWD/dist/v<VERSION>/arm64" scripts/build-app.sh` and `ARCH=x86_64 OUTPUT_DIR="$PWD/dist/v<VERSION>/x86_64" scripts/build-app.sh`. The script embeds the pinned Sparkle framework and chooses the matching feed.
 3. Run `python3 scripts/prepare-release.py <VERSION>` on the signing Mac. It reads the key via Sparkle, signs archives and feeds, verifies signatures, and writes public feeds. No private key is exported.
-4. Commit reviewed source and feeds, confirm CI, then publish a GitHub Release with tag `v<VERSION>` and the two exact archives from step 2. Never replace an asset under an existing published version; publish a higher build/version instead.
+4. Commit reviewed source and documentation, confirm CI, then publish a GitHub Release with tag `v<VERSION>` targeting the full commit SHA and the exact ZIP/DMG assets verified above. Verify the uploaded assets before publishing the signed feeds, so clients never see a feed pointing to unavailable downloads. Never replace an asset under an existing published version; publish a higher build/version instead.
 5. Check both public feed URLs and asset downloads. Run `python3 scripts/test-updater.py` for disposable-app tests of signed installation and rejection of modified archives/feeds when changing the updater. It uses a disposable test key and has no access to account credentials or the production signing key.
 
 CI builds and tests without a publishing key. Release signing is local. Forks should change the maintainer links and feed URLs and generate their own signing key before distributing updates; never pretend to use the original publisher’s signing identity.
@@ -60,8 +62,8 @@ dist/packaging-venv/bin/pip install -r scripts/dmg-requirements.txt
 After building a release, package and verify each architecture (replace the version when preparing a new release):
 
 ```sh
-ARCH=arm64 OUTPUT_DIR="$PWD/dist/v0.4.2/arm64" scripts/build-dmg.sh
-python3 scripts/verify-dmg.py dist/v0.4.2/arm64/Codex-Accounts-macOS-arm64.dmg dist/v0.4.2/arm64/Codex-Accounts-macOS-arm64.zip
+ARCH=arm64 OUTPUT_DIR="$PWD/dist/v0.4.3/arm64" scripts/build-dmg.sh
+python3 scripts/verify-dmg.py dist/v0.4.3/arm64/Codex-Accounts-macOS-arm64.dmg dist/v0.4.3/arm64/Codex-Accounts-macOS-arm64.zip
 ```
 
 Repeat with `x86_64`. Open the DMG normally in Finder to inspect the icon layout, arrow and installation text. The verifier mounts read-only, checks the app signature, compares every app file and symlink with the ZIP, and scans for private home paths. It never launches the packaged app.

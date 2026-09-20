@@ -53,3 +53,7 @@ Menu layout and local-file storage ideas also reference [liuzhao1225/codex-accou
 ## 0.4.1 all-account refresh
 
 Inactive accounts can now display freshly queried quota. Use cache wording only when data is stale or a query failed; show “需要重新登录” for expired credentials. Both More menus expose “刷新全部账号额度”; the account detail and context menu refresh the selected account. A batch shows its account count, cancellation and final success count. The status-bar percentage still represents only the active saved account.
+
+## 0.4.3 compact quota rows (candidate)
+
+The menu shows remaining percentage and the selected quota window's reset time above its meter. Plan, window duration, countdown, full local timestamp/timezone and last query move into the row tooltip and accessibility value. Formatting follows the system's autoupdating timezone and locale, including the offset applicable at the reset instant and cross-year dates. Missing dates remain unknown; elapsed reset times do not imply restored quota. Stale cached percentages remain visibly marked. The existing model clock drives freshness; no additional status-label timer is introduced.

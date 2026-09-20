@@ -99,35 +99,28 @@ private struct QuickAccountRow: View {
     let action: () -> Void
     @State private var hovered = false
     var current: Bool { account.id == model.currentIdentity }
+    var summary: MenuQuotaSummary { MenuQuotaSummary.make(account: account, now: model.quotaDisplayDate) }
     var body: some View {
         Button(action: action) {
             HStack(spacing: 11) {
                 AccountAvatar(account: account, hideEmails: model.hideEmails, size: 36)
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 7) { Text(model.title(account)).font(.system(size: 13, weight: .medium)).lineLimit(1); if current { Text("当前认证").font(.system(size: 9, weight: .medium)).foregroundStyle(.tint) }; Spacer(minLength: 0) }
-                    HStack(spacing: 7) {
-                        Text(account.plan.uppercased()).font(.system(size: 10)).foregroundStyle(.secondary)
-                        if let quota = QuotaPresentation.summary(account.quotas) {
-                            Text("·").foregroundStyle(.tertiary)
-                            Text("Codex \(QuotaPresentation.duration(quota))剩余 \(Int(quota.remaining))%").font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
-
-                        } else { Text("· Codex 额度未读取").font(.system(size: 10)).foregroundStyle(.secondary) }
-                    }
+                    Text(summary.text)
+                        .font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)
                     if account.quotaNeedsLogin == true {
                         Text("需要重新登录").font(.system(size: 10)).foregroundStyle(.orange)
                     }
                     if let quota = QuotaPresentation.summary(account.quotas) { QuotaMeter(window: quota, height: 3) }
-                    TimelineView(.periodic(from: .now, by: 60)) { context in
-                        Text("\(AccountPresentation.needsRefresh(account, now: context.date) ? "上次记录 · " : "")\(AccountPresentation.updatedLabel(account, now: context.date))")
-                            .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
-                    }
                 }
                 Image(systemName: current ? "arrow.up.forward" : "arrow.right").font(.caption.weight(.medium)).foregroundStyle(hovered ? .primary : .tertiary)
             }.padding(.horizontal, 11).padding(.vertical, 12)
                 .background(current ? Color.accentColor.opacity(hovered ? 0.13 : 0.08) : hovered ? Color.primary.opacity(0.055) : .clear, in: RoundedRectangle(cornerRadius: 10))
                 .contentShape(RoundedRectangle(cornerRadius: 10))
         }.buttonStyle(.plain).onHover { hovered = $0 }
-            .help(current ? "打开桌面 App" : "查看切换确认")
+            .help("\(summary.help)\n\(current ? "打开桌面 App" : "查看切换确认")")
             .accessibilityLabel("\(model.title(account))，\(current ? "当前认证，打开桌面 App" : "切换账号")")
+            .accessibilityValue("\(summary.text)\n\(summary.help)\(account.quotaNeedsLogin == true ? "\n需要重新登录" : "")")
     }
 }
