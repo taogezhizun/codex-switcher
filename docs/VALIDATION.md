@@ -94,10 +94,12 @@ Renamed the app's display and bundle names to Codex Switcher, including window/m
 
 An isolated synthetic preview verified the window, menu and About name plus version 0.4.2. The new README illustration was visually inspected in a browser and is explicitly marked as fictional; it does not imply an English app interface. The English README states that the current interface is Chinese. The English X copy fits a standard 280-character post (228 characters with the URL counted as 23); it is provided as a draft and was not posted.
 
-## 0.4.3 compact quota candidate (not published)
+## 0.4.3 compact quota rows
 
 89 local tests passed with zero failures and zero skips, including the opt-in signed-out real Codex CLI smoke test in an empty isolated home. Six new presentation tests cover timezone date boundaries, DST offsets, cross-year formatting, missing and elapsed reset times, stale cache labels, and using percentage/reset from the same quota window.
 
 Both Apple Silicon and Intel release apps and DMGs were built. Both installers passed app signature, exact app-file/symlink comparison against the corresponding ZIP, Applications-shortcut and private-path checks. The archives and local appcast feeds were signed and verified with the existing publishing key without exporting it. Bundle identity, installed archive root, signing public key and feed URLs remain unchanged.
 
-Native visual acceptance remains pending: automatic approval review refused to launch the preview-only bundle, including after verification that its executable matches the release code before signing, its bundle uses the synthetic all-quota mode, and demo startup skips the account store and network services. No installed app, real account store, live credentials or public appcast was modified. The candidate has not been published. Intel UI and real-account operations remain outside this isolated validation.
+The native menu component was inspected in an isolated synthetic preview on Apple Silicon after explicit permission to launch it. Remaining percentages, local reset dates and progress bars fit without truncation; the current-account highlight, stale-cache wording and re-login warning were visible. Accessibility help/value exposed the quota window, reset countdown, full reset timestamp with Asia/Shanghai and UTC+08:00, and last query time. The preview did not load real accounts or run account operations. Intel UI and real-account operations remain outside this isolated validation.
+
+GitHub CI passed for the source change, including privacy scanning, unit tests, native build and installer verification. All four uploaded release assets matched local SHA-256 digests and byte counts. Public feeds are published only after the release assets become available.
