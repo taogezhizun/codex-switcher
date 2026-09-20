@@ -3,7 +3,9 @@ import AccountsCore
 
 struct AccountsView: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var menuBar: MenuBarController
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @State private var search = ""
     @State private var sidebarVisible = true
     @FocusState private var searchFocused: Bool
@@ -88,7 +90,7 @@ struct AccountsView: View {
             ToolbarItemGroup {
                 if model.demo {
                     Text("DEMO").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
-                    Button("预览菜单栏", systemImage: "menubar.rectangle") { openWindow(id: "menu-preview") }.help("打开使用同一组件的菜单栏预览")
+                    Button("预览菜单栏", systemImage: "menubar.rectangle") { menuBar.show() }.help("打开实际菜单栏弹窗（虚构账号）")
                 }
                 Button {
                     model.hideEmails.toggle()
@@ -115,7 +117,10 @@ struct AccountsView: View {
             Button("取消", role: .cancel) { pendingDelete = nil }
             Button("移除", role: .destructive) { if let id = pendingDelete?.id { model.delete(id) }; pendingDelete = nil }
         } message: { Text("仅移除本工具保存的账号。桌面 App 当前登录和恢复备份会保留。") }
-        .onAppear { model.checkCurrentIdentity() }
+        .onAppear {
+            model.checkCurrentIdentity()
+            menuBar.start(model: model, manage: { openWindow(id: "accounts") }, settings: { openSettings() })
+        }
         .onChange(of: search) { _, _ in
             if !filtered.contains(where: { $0.id == model.selection }) {
                 model.selection = filtered.first?.id

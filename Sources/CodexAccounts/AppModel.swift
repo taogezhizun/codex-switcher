@@ -267,9 +267,14 @@ import AccountsCore
             guard !windows.isEmpty, let index = store.accounts.firstIndex(where: { $0.id == id }) else {
                 throw AccountsError.message("未返回可用额度，保留上次记录。")
             }
-            store.accounts[index].quotas = windows; store.accounts[index].updatedAt = Date()
+            let observedAt = Date()
+            var daily = store.accounts[index].dailyUsage ?? DailyQuotaUsage(at: observedAt)
+            daily.record(windows, at: observedAt)
+            store.accounts[index].dailyUsage = daily
+            store.accounts[index].quotas = windows; store.accounts[index].updatedAt = observedAt
             store.accounts[index].issue = nil; store.accounts[index].quotaNeedsLogin = false; store.accounts[index].quotaRejectedFingerprint = nil
             try store.save(); sync()
+            quotaDisplayDate = observedAt
             refreshSchedule.request(id, now: Date())
             refreshSchedule.completed(id, succeeded: true, now: Date())
             return true
@@ -468,6 +473,19 @@ import AccountsCore
             accounts[0].quotas = [accounts[0].quotas[1]]
             selection = accounts[0].id
         }
+        if PreviewConfiguration.variant == "menu" {
+            let now = Date()
+            for index in 0..<2 {
+                var usage = DailyQuotaUsage(at: now.addingTimeInterval(-60))
+                let baseline = accounts[index].quotas.map {
+                    QuotaWindow(id: $0.id, label: $0.label, remaining: min(100, $0.remaining + 8), resetsAt: $0.resetsAt, bucketID: $0.bucketID)
+                }
+                usage.record(baseline, at: now.addingTimeInterval(-60))
+                usage.record(accounts[index].quotas, at: now)
+                accounts[index].dailyUsage = usage
+            }
+        }
+        quotaDisplayDate = Date()
         status = "演示模式 · 所有账号与额度均为虚构，操作已禁用。"
     }
 }

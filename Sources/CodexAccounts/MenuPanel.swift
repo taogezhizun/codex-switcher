@@ -4,8 +4,10 @@ import AccountsCore
 
 struct MenuPanel: View {
     @EnvironmentObject var model: AppModel
-    @Environment(\.openWindow) private var openWindow
+    @EnvironmentObject var menuBar: MenuBarController
+    @Environment(\.colorScheme) private var colorScheme
     @State private var query = ""
+    @State private var contentHeight: CGFloat = 0
     @State private var pending: Account?
     @State private var recovering = false
     var accounts: [Account] { AccountPresentation.ordered(model.accounts, current: model.currentIdentity, query: query) }
@@ -56,7 +58,13 @@ struct MenuPanel: View {
                                     .disabled(model.busy || (account.id != model.currentIdentity && model.switchBlockReason(account.id) != nil))
                                 }
                             }.padding(.horizontal, 8)
-                        }.frame(height: min(CGFloat(accounts.count) * 100, 340))
+                                .background(GeometryReader { geometry in
+                                    Color.clear.preference(key: MenuRowsHeight.self, value: geometry.size.height)
+                                })
+                        }.frame(height: min(contentHeight > 0 ? contentHeight : CGFloat(accounts.count) * 88, 340))
+                            .onPreferenceChange(MenuRowsHeight.self) { height in
+                                if abs(height - contentHeight) > 0.5 { contentHeight = height }
+                            }
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
@@ -76,7 +84,7 @@ struct MenuPanel: View {
                 MenuUpdateNotice(updates: model.updates).padding(.horizontal, 14)
                 Divider()
                 HStack {
-                    Button { openWindow(id: "accounts"); NSApp.activate(ignoringOtherApps: true) } label: { Label("管理账号", systemImage: "sidebar.left") }
+                    Button { menuBar.openAccounts() } label: { Label("管理账号", systemImage: "sidebar.left") }
                     Spacer()
                     Menu {
                         Button("刷新全部账号额度") { model.refreshAll() }.disabled(model.busy || model.demo || model.awaitingConfirmation)
@@ -84,11 +92,13 @@ struct MenuPanel: View {
                             .disabled((!model.hasBackup && !model.recoveryNeedsUnlock) || model.credentialActionsBlocked)
                         CheckForAppUpdates(updates: model.updates)
                     } label: { Image(systemName: "ellipsis") }.help("更多操作")
-                    SettingsLink { Image(systemName: "gearshape") }.help("设置")
+                    Button { menuBar.openSettings() } label: { Image(systemName: "gearshape") }.help("设置")
                     Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }.help("退出 Codex Switcher").disabled(model.busy)
                 }.buttonStyle(.borderless).padding(15)
             }
-        }.frame(width: 368).onAppear { model.checkCurrentIdentity() }
+        }.frame(width: 368).fixedSize(horizontal: false, vertical: true)
+            .background((colorScheme == .dark ? Color(red: 0.12, green: 0.12, blue: 0.13) : Color(red: 0.97, green: 0.97, blue: 0.98)).ignoresSafeArea())
+            .onAppear { model.checkCurrentIdentity() }
             .sheet(isPresented: $model.showMigration) { MigrationView().environmentObject(model) }
     }
 }
@@ -100,12 +110,18 @@ private struct QuickAccountRow: View {
     @State private var hovered = false
     var current: Bool { account.id == model.currentIdentity }
     var summary: MenuQuotaSummary { MenuQuotaSummary.make(account: account, now: model.quotaDisplayDate) }
+    var daily: DailyUsagePresentation { DailyUsagePresentation.make(account: account, now: model.quotaDisplayDate) }
     var body: some View {
         Button(action: action) {
             HStack(spacing: 11) {
                 AccountAvatar(account: account, hideEmails: model.hideEmails, size: 36)
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 7) { Text(model.title(account)).font(.system(size: 13, weight: .medium)).lineLimit(1); if current { Text("当前认证").font(.system(size: 9, weight: .medium)).foregroundStyle(.tint) }; Spacer(minLength: 0) }
+                    HStack(spacing: 6) {
+                        Text(model.title(account)).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                        if current { Text("当前认证").font(.system(size: 9, weight: .medium)).foregroundStyle(.tint).fixedSize() }
+                        Spacer(minLength: 0)
+                        Text(daily.text).font(.system(size: 9)).monospacedDigit().foregroundStyle(.secondary).fixedSize().help(daily.help)
+                    }
                     Text(summary.text)
                         .font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
@@ -119,8 +135,13 @@ private struct QuickAccountRow: View {
                 .background(current ? Color.accentColor.opacity(hovered ? 0.13 : 0.08) : hovered ? Color.primary.opacity(0.055) : .clear, in: RoundedRectangle(cornerRadius: 10))
                 .contentShape(RoundedRectangle(cornerRadius: 10))
         }.buttonStyle(.plain).onHover { hovered = $0 }
-            .help("\(summary.help)\n\(current ? "打开桌面 App" : "查看切换确认")")
+            .help("\(summary.help)\n\(daily.help)\n\(current ? "打开桌面 App" : "查看切换确认")")
             .accessibilityLabel("\(model.title(account))，\(current ? "当前认证，打开桌面 App" : "切换账号")")
-            .accessibilityValue("\(summary.text)\n\(summary.help)\(account.quotaNeedsLogin == true ? "\n需要重新登录" : "")")
+            .accessibilityValue("\(summary.text)\n\(daily.text)\n\(summary.help)\n\(daily.help)\(account.quotaNeedsLogin == true ? "\n需要重新登录" : "")")
     }
+}
+
+private struct MenuRowsHeight: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

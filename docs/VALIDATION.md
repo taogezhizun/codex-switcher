@@ -13,7 +13,7 @@ The release script verifies its ad-hoc signature and scans executable strings fo
 Use two of your own accounts and pause work in every client sharing the credential directory.
 
 1. Save the currently logged-in account A; add B through the OpenAI browser flow. Confirm the desktop still shows A.
-2. Verify B shows cached/unknown quota and its refresh control is disabled. Refresh A and verify only its timestamp changes.
+2. After file-store migration, refresh both saved accounts without switching the desktop. Verify each timestamp and result changes independently; a failure keeps its previous cache. Before migration, only the current account can refresh.
 3. Switch A → B. Confirm the desktop closes normally, reopens, and its account screen shows B. Only then confirm success in the utility.
 4. Use recovery. Confirm the desktop returns to A. Then test a normal B → A switch.
 5. Verify preferences and existing local tasks remain usable; restart the utility during a pending confirmation and confirm recovery is still available.
@@ -113,3 +113,9 @@ The native main window was inspected with fictional accounts at its default geom
 Both final architecture builds and DMG/ZIP content, application signatures and private-path checks passed. Production update signatures use the existing key; stable bundle identity, archive roots and feed URLs remain unchanged. No real account, migration or desktop switching was performed.
 
 GitHub CI passed for the 0.4.4 source commit, including tests, privacy checks, native build and DMG verification. All four published DMG/ZIP downloads matched the final local SHA-256 hashes. Both local appcast feeds and ZIPs passed Sparkle signature verification with the unchanged publishing key; feeds are pushed after public download verification.
+
+## 0.4.5 menu and daily observations
+
+The menu now uses one AppKit status item and an NSPopover hosting the same SwiftUI content used in production. Synthetic light/dark popovers were inspected for opaque backgrounds and complete edges. Filtering shrank the native popup; choosing an inactive synthetic account showed the compact switch confirmation. Repeated management actions reused the singleton accounts window; closing and reopening it retained the selected account. These checks do not access real credentials or perform a desktop switch.
+
+All 98 local tests passed with zero failures or skips, including the isolated signed-out official CLI test. Daily observation tests cover first-sample unknown values, zero usage, accumulation, persistence, midnight, time-zone changes, DST, quota resets/replenishment, independent windows, metadata changes, and invalid/out-of-order samples. AppModel tests query two synthetic saved accounts, verify independent persisted estimates and preserve history on failure, with zero Keychain reads.

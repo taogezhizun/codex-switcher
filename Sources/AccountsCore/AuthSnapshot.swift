@@ -104,6 +104,7 @@ public struct Account: Codable, Identifiable, Equatable {
     public var issue: String?
     public var quotaNeedsLogin: Bool?
     public var quotaRejectedFingerprint: String?
+    public var dailyUsage: DailyQuotaUsage?
     public init(snapshot: AuthSnapshot) {
         id = snapshot.identity; nickname = ""; email = snapshot.email; plan = snapshot.plan; quotas = []
     }

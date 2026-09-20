@@ -6,6 +6,7 @@ import AccountsCore
     var started: [String] = []
     var tokens: [String: String] = [:]
     var failures: Set<String> = []
+    var remaining: [String: Double] = [:]
     var expired: Set<String> = []
     var active = 0
     var peak = 0
@@ -24,7 +25,7 @@ import AccountsCore
         try await Task.sleep(nanoseconds: probe.delay)
         if probe.expired.contains(snapshot.identity) { throw QuotaReadError.needsLogin }
         if probe.failures.contains(snapshot.identity) { throw AccountsError.message("Synthetic network error") }
-        return [.init(id: "codex.week", label: "7 天", remaining: 74, bucketID: "codex")]
+        return [.init(id: "codex.week", label: "7 天", remaining: probe.remaining[snapshot.identity] ?? 74, bucketID: "codex")]
     }
     func cancel() { probe.cancelled += 1 }
 }
@@ -95,6 +96,22 @@ import AccountsCore
         XCTAssertEqual(failed.updatedAt, Date(timeIntervalSince1970: 1000)); XCTAssertNotNil(failed.issue)
         XCTAssertEqual(f.model.accounts.filter { $0.quotas.first?.remaining == 74 }.count, 2)
         XCTAssertTrue(f.model.status.contains("2/3"))
+    }
+    func testDailyEstimatesPersistPerAccountAndFailedQueriesDoNotChangeThem() async throws {
+        let f = try Fixture(); defer { f.close() }
+        f.model.refreshAll(); await f.finish()
+        XCTAssertTrue(f.model.accounts.allSatisfy { DailyUsagePresentation.make(account: $0, now: Date()).text == "今日已用 —" })
+        f.probe.remaining[f.ids[0]] = 66
+        f.model.refreshAll(); await f.finish()
+        XCTAssertEqual(DailyUsagePresentation.make(account: f.model.accounts[0], now: f.model.quotaDisplayDate).text, "今日已用≈8%")
+        XCTAssertEqual(DailyUsagePresentation.make(account: f.model.accounts[1], now: f.model.quotaDisplayDate).text, "今日已用≈0%")
+        f.reopen()
+        XCTAssertEqual(DailyUsagePresentation.make(account: f.model.accounts[0], now: Date()).text, "今日已用≈8%")
+        let before = f.model.accounts[0].dailyUsage
+        f.probe.failures = [f.ids[0]]
+        f.model.refresh(f.ids[0]); await f.finish()
+        XCTAssertEqual(f.model.accounts[0].dailyUsage, before)
+        XCTAssertTrue(f.storage.reads.isEmpty)
     }
     func testExpiredAccountPausesAcrossRestartAndManualRetryCanRecover() async throws {
         let f = try Fixture(); defer { f.close() }
