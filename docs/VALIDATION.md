@@ -103,3 +103,11 @@ Both Apple Silicon and Intel release apps and DMGs were built. Both installers p
 The native menu component was inspected in an isolated synthetic preview on Apple Silicon after explicit permission to launch it. Remaining percentages, local reset dates and progress bars fit without truncation; the current-account highlight, stale-cache wording and re-login warning were visible. Accessibility help/value exposed the quota window, reset countdown, full reset timestamp with Asia/Shanghai and UTC+08:00, and last query time. The preview did not load real accounts or run account operations. Intel UI and real-account operations remain outside this isolated validation.
 
 GitHub CI passed for the source change, including privacy scanning, unit tests, native build and installer verification. All four uploaded release assets matched local SHA-256 digests and byte counts. Public feeds are published only after the release assets become available.
+
+## 0.4.4 main-window layout
+
+89 local tests passed with zero failures and zero skips, including the signed-out real Codex CLI smoke test in an isolated home. No authentication, storage, quota scheduling or updater logic changed. A preview-only fixture provides one Codex window for the current synthetic account and two windows for another account.
+
+The native main window was inspected with fictional accounts at its default geometry, minimum size after attempted shrinking, system-zoomed size and with the sidebar collapsed/reopened. Active-window titlebar continuity, single/two-window quota cards, header actions, light and dark appearances, and the unchanged compact menu were checked. Search filtering, zero results, clearing and Command-F reopening/focusing the sidebar were exercised. The moved switch button opened the existing confirmation sheet; the final demo operation remained disabled and cancellation returned to the same account. These checks do not establish real-account switching or Intel/older-macOS visual acceptance.
+
+Both final architecture builds and DMG/ZIP content, application signatures and private-path checks passed. Production update signatures use the existing key; stable bundle identity, archive roots and feed URLs remain unchanged. No real account, migration or desktop switching was performed.

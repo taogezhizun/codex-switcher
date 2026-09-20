@@ -10,27 +10,40 @@ struct AccountDetail: View {
     private var isCurrent: Bool { model.currentIdentity == account.id }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .center, spacing: 15) {
-                    AccountAvatar(account: account, hideEmails: model.hideEmails, size: 58)
+                    AccountAvatar(account: account, hideEmails: model.hideEmails, size: 44)
                     VStack(alignment: .leading, spacing: 7) {
-                        Text(model.title(account)).font(.system(size: 26, weight: .semibold)).lineLimit(2).textSelection(.enabled)
                         HStack(spacing: 8) {
-                            Text(AccountPresentation.email(account, hideEmails: model.hideEmails)).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                            Text(model.title(account)).font(.system(size: 22, weight: .semibold)).lineLimit(2).textSelection(.enabled)
+                            if isCurrent {
+                                Image(systemName: "checkmark.circle.fill").font(.callout).foregroundStyle(.tint)
+                                    .accessibilityLabel("当前认证")
+                                    .help("当前认证：与本地认证文件匹配，实际登录状态可在 Codex 中核对。")
+                            }
+                        }
+                        HStack(spacing: 8) {
+                            Text(AccountPresentation.email(account, hideEmails: model.hideEmails)).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
                             PlanBadge(plan: account.plan)
                         }
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 8)
+                    if isCurrent {
+                        Button { model.openDesktop() } label: { Label("打开 Codex", systemImage: "arrow.up.forward.app") }
+                            .disabled(model.busy || model.demo).fixedSize()
+                            .help("打开 Codex，核对实际登录状态。")
+                    } else {
+                        Button(action: switchAction) { Label("切换账号…", systemImage: "arrow.triangle.2.circlepath") }
+                            .buttonStyle(.borderedProminent).keyboardShortcut(.return, modifiers: .command).fixedSize()
+                            .disabled(model.switchBlockReason(account.id) != nil)
+                            .help(model.switchBlockReason(account.id) ?? "查看切换确认（⌘↩）")
+                    }
                     Menu {
                         Button("编辑备注…") { renameAction() }.keyboardShortcut("e").disabled(model.busy || model.demo)
                         Divider()
                         Button("移除账号…", role: .destructive) { deleteAction() }.disabled(model.busy || model.demo)
                     } label: { Image(systemName: "ellipsis").frame(width: 20, height: 20) }
                         .menuStyle(.borderlessButton).fixedSize().help("账号操作").accessibilityLabel("账号操作")
-                }
-                if isCurrent {
-                    Label("当前认证", systemImage: "checkmark.circle.fill").font(.caption.weight(.medium)).foregroundStyle(.tint)
-                        .help("该账号与本地认证文件匹配。桌面 App 的实际账号仍需在 App 中核对。")
                 }
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
@@ -58,32 +71,16 @@ struct AccountDetail: View {
                         Label("这是上次记录的额度，可以刷新确认。", systemImage: "clock.arrow.circlepath").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                VStack(alignment: .leading, spacing: 15) {
-                    Divider()
-                    HStack(alignment: .center, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(isCurrent ? "已经是当前认证" : "准备切换到这个账号？").font(.system(size: 14, weight: .medium))
-                            Text(isCurrent ? "打开桌面 App，确认实际登录状态。" : "将正常退出并重新打开桌面 App。")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        if isCurrent {
-                            Button { model.openDesktop() } label: { Label("打开 Codex", systemImage: "arrow.up.forward.app") }
-                                .controlSize(.large).disabled(model.busy || model.demo)
-                        } else {
-                            Button(action: switchAction) { Label("切换至此账号…", systemImage: "arrow.triangle.2.circlepath").padding(.horizontal, 3) }
-                                .buttonStyle(.borderedProminent).controlSize(.large).keyboardShortcut(.return, modifiers: .command)
-                                .disabled(model.switchBlockReason(account.id) != nil)
-                                .help(model.switchBlockReason(account.id) ?? "查看切换确认（⌘↩）")
-                        }
-                    }
-                    if !isCurrent, let reason = model.switchBlockReason(account.id) {
+                if !isCurrent {
+                    if let reason = model.switchBlockReason(account.id) {
                         Label(reason, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
-                    } else if !isCurrent {
-                        HStack(spacing: 5) { Image(systemName: "arrow.uturn.backward.circle"); Text("自动保存上一次认证，可随时恢复。") }.font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Label("切换会正常退出并重开 Codex，并自动备份上一次认证。", systemImage: "arrow.uturn.backward.circle")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
-            }.padding(30).frame(maxWidth: 780, alignment: .leading)
+            }.padding(24).frame(maxWidth: 740, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -91,19 +88,21 @@ struct AccountDetail: View {
 struct QuotaCard: View {
     let window: QuotaWindow
     var body: some View {
-        VStack(alignment: .leading, spacing: 17) {
-            HStack { Text(QuotaPresentation.duration(window)).font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary); Spacer(); Image(systemName: QuotaPresentation.duration(window).contains("7 天") ? "calendar" : "clock").foregroundStyle(.tertiary) }
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("\(Int(window.remaining))").font(.system(size: 39, weight: .semibold, design: .rounded)).monospacedDigit()
-                Text("%").font(.title3).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(QuotaPresentation.duration(window)).font(.callout.weight(.medium)).foregroundStyle(.secondary)
                 Spacer()
                 if window.remaining < 20 { Text("偏低").font(.caption).foregroundStyle(.orange) }
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("\(Int(window.remaining))").font(.system(size: 28, weight: .semibold, design: .rounded)).monospacedDigit()
+                    Text("%").font(.callout).foregroundStyle(.secondary)
+                }
             }
-            QuotaMeter(window: window, height: 6)
+            QuotaMeter(window: window, height: 5)
             if let reset = window.resetsAt {
                 Text("\(reset.formatted(date: .abbreviated, time: .shortened)) 重置").font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
             } else { Text("重置时间未知").font(.system(size: 10)).foregroundStyle(.tertiary) }
-        }.padding(19).frame(maxWidth: .infinity, alignment: .leading)
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
             .background(.background, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(.quaternary))
             .accessibilityElement(children: .combine)

@@ -16,7 +16,7 @@ A native macOS menu bar utility for managing your own Codex desktop accounts.
 - **See your active account's remaining usage** in the menu bar.
 - **Update in place** through the app's signed update channel.
 
-**Version 0.4.3:** Compact menu quota rows show remaining usage and the reset time in your system timezone. Hover for the quota window, reset countdown and last query time. Existing accounts, settings and update URLs are preserved. The repository URL and legacy installer filenames remain unchanged for compatibility.
+**Version 0.4.4:** A continuous title bar fixes the sidebar seam. A compact account header keeps open/switch actions close, removes repeated status text and gives single-window quotas a bounded card width. Local-time reset summaries remain in the menu. Existing accounts, settings and update URLs are preserved. The repository URL and legacy installer filenames remain unchanged for compatibility.
 
 ## Get started
 

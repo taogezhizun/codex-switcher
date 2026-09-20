@@ -91,7 +91,7 @@ private struct QuotaGroupView: View {
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 190), spacing: 14), count: min(2, group.windows.count)), spacing: 14) {
                 ForEach(group.windows) { window in QuotaCard(window: window) }
-            }
+            }.frame(maxWidth: group.windows.count == 1 ? 440 : .infinity, alignment: .leading)
         }
     }
 }

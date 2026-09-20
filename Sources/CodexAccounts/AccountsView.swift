@@ -5,6 +5,8 @@ struct AccountsView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @State private var search = ""
+    @State private var sidebarVisible = true
+    @FocusState private var searchFocused: Bool
     @State private var pendingSwitch: Account?
     @State private var pendingRename: Account?
     @State private var pendingDelete: Account?
@@ -12,33 +14,44 @@ struct AccountsView: View {
     var filtered: [Account] { AccountPresentation.ordered(model.accounts, current: model.currentIdentity, query: search) }
 
     var body: some View {
-        NavigationSplitView {
-            VStack(spacing: 0) {
-                List(selection: $model.selection) {
-                    Section {
-                        ForEach(filtered) { account in
-                            AccountSidebarRow(account: account).tag(account.id)
-                                .contextMenu {
-                                    Button("切换至此账号…") { pendingSwitch = account }.disabled(model.switchBlockReason(account.id) != nil)
-                                    Button("刷新额度") { model.refresh(account.id) }.disabled(!model.canRefresh(account.id))
-                                    Divider()
-                                    Button("编辑备注…") { pendingRename = account }.disabled(model.busy || model.demo)
-                                    Button("移除账号…", role: .destructive) { pendingDelete = account }.disabled(model.busy || model.demo)
-                                }
+        HSplitView {
+            if sidebarVisible {
+                VStack(spacing: 0) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField("搜索备注或邮箱", text: $search).textFieldStyle(.plain)
+                            .focused($searchFocused).accessibilityLabel("搜索备注或邮箱")
+                        if !search.isEmpty {
+                            Button { search = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                                .buttonStyle(.plain).accessibilityLabel("清除搜索")
                         }
-                    } header: {
-                        HStack { Text(search.isEmpty ? "已保存的账号" : "搜索结果"); Spacer(); Text("\(filtered.count)").monospacedDigit() }
-                    }
-                }.listStyle(.sidebar)
-                Divider().padding(.horizontal, 14)
-                HStack(spacing: 7) {
-                    Image(systemName: model.demo ? "play.rectangle" : "lock.shield")
-                    Text(model.demo ? "虚构账号 · 安全演示" : "本机文件存储").font(.caption)
-                    Spacer()
-                }.foregroundStyle(.secondary).padding(16)
+                    }.padding(7).background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 7)).padding(10)
+                    List(selection: $model.selection) {
+                        Section {
+                            ForEach(filtered) { account in
+                                AccountSidebarRow(account: account).tag(account.id)
+                                    .contextMenu {
+                                        Button("切换至此账号…") { pendingSwitch = account }.disabled(model.switchBlockReason(account.id) != nil)
+                                        Button("刷新额度") { model.refresh(account.id) }.disabled(!model.canRefresh(account.id))
+                                        Divider()
+                                        Button("编辑备注…") { pendingRename = account }.disabled(model.busy || model.demo)
+                                        Button("移除账号…", role: .destructive) { pendingDelete = account }.disabled(model.busy || model.demo)
+                                    }
+                            }
+                        } header: {
+                            HStack { Text(search.isEmpty ? "已保存的账号" : "搜索结果"); Spacer(); Text("\(filtered.count)").monospacedDigit() }
+                        }
+                    }.listStyle(.sidebar)
+                    Divider().padding(.horizontal, 14)
+                    HStack(spacing: 7) {
+                        Image(systemName: model.demo ? "play.rectangle" : "lock.shield")
+                        Text(model.demo ? "虚构账号 · 安全演示" : "本机文件存储").font(.caption)
+                        Spacer()
+                    }.foregroundStyle(.secondary).padding(16)
+                }
+                .frame(minWidth: 240, idealWidth: 260, maxWidth: 300)
+                .background(.regularMaterial, ignoresSafeAreaEdges: [])
             }
-            .navigationSplitViewColumnWidth(min: 240, ideal: 260, max: 300)
-        } detail: {
             VStack(spacing: 0) {
                 if model.needsMigration { MigrationBanner().padding([.top, .horizontal], 24) }
                 if model.awaitingConfirmation {
@@ -60,10 +73,18 @@ struct AccountsView: View {
                     ContentUnavailableView("选择一个账号", systemImage: "sidebar.left", description: Text("在左侧选择账号，查看额度或进行切换。"))
                 }
                 StatusFooter()
-            }.background(Color(nsColor: .windowBackgroundColor))
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor), ignoresSafeAreaEdges: [])
         }
-        .searchable(text: $search, placement: .sidebar, prompt: "搜索备注或邮箱")
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    sidebarVisible.toggle()
+                } label: { Image(systemName: "sidebar.left") }
+                    .accessibilityLabel(sidebarVisible ? "收起侧栏" : "显示侧栏")
+                    .help(sidebarVisible ? "收起侧栏" : "显示侧栏")
+                    .keyboardShortcut("s", modifiers: [.command, .control])
+            }
             ToolbarItemGroup {
                 if model.demo {
                     Text("DEMO").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
@@ -81,6 +102,7 @@ struct AccountsView: View {
                     Button("打开桌面 App") { model.openDesktop() }.disabled(model.busy || model.demo)
                     Button("恢复上次认证…") { showRestore = true }.disabled((!model.hasBackup && !model.recoveryNeedsUnlock) || model.busy || model.demo)
                     Divider()
+                    Button("搜索账号") { sidebarVisible = true; searchFocused = true }.keyboardShortcut("f")
                     SettingsLink { Text("设置…") }
                 } label: { Label("更多操作", systemImage: "ellipsis.circle") }.help("更多操作")
             }

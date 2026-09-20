@@ -464,6 +464,10 @@ import AccountsCore
             ]])
         }
         selection = accounts[1].id; currentIdentity = accounts[0].id
+        if PreviewConfiguration.variant == "layout" {
+            accounts[0].quotas = [accounts[0].quotas[1]]
+            selection = accounts[0].id
+        }
         status = "演示模式 · 所有账号与额度均为虚构，操作已禁用。"
     }
 }

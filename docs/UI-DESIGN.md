@@ -57,3 +57,9 @@ Inactive accounts can now display freshly queried quota. Use cache wording only 
 ## 0.4.3 compact quota rows
 
 The menu shows remaining percentage and the selected quota window's reset time above its meter. Plan, window duration, countdown, full local timestamp/timezone and last query move into the row tooltip and accessibility value. Formatting follows the system's autoupdating timezone and locale, including the offset applicable at the reset instant and cross-year dates. Missing dates remain unknown; elapsed reset times do not imply restored quota. Stale cached percentages remain visibly marked. The existing model clock drives freshness; no additional status-label timer is introduced.
+
+## 0.4.4 main window
+
+Use a unified, full-width native toolbar above an HSplitView. The sidebar divider begins below the toolbar, so automatic navigation-titlebar materials no longer create an offset seam. Keep the sidebar resizable between 240 and 300 points and provide an explicit collapse control. Search retains filtering, clear/no-results behavior and a Command-F entry in the More menu.
+
+Account identity, a single current-auth indicator and the open/switch action share one header. Current-auth matching remains distinct from verified desktop login in the indicator/button help. Quota cards put the period and percentage on one row; a single card is limited to 440 points, while two windows share a row. Detail content has 24-point insets, 20-point section spacing and a 740-point maximum width. The default window is 900 by 620 points; existing saved window geometry may be restored by macOS.

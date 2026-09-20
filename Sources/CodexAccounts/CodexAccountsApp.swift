@@ -9,7 +9,8 @@ import AppKit
                 .frame(minWidth: 820, minHeight: 590)
                 .preferredColorScheme(model.preferredColorScheme)
         }
-        .defaultSize(width: 960, height: 680)
+        .defaultSize(width: 900, height: 620)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(after: .appInfo) {
                 CheckForAppUpdates(updates: model.updates).environmentObject(model)
