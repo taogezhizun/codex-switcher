@@ -127,3 +127,11 @@ The 0.4.5 menu called application activation before showing the popover; this co
 A disposable separate AppKit fixture entered native full screen and invoked the same show path through a temporary demo-only trigger. After the menu opened, the fixture independently recorded fullScreen=true and isOnActiveSpace=true; the popup recorded isOnActiveSpace=true with the frontmost application unchanged. Search input and unknown daily-usage rendering were checked in the popup. The management window displayed the shared estimate and its quota-period description with synthetic data. Temporary triggers and diagnostics were removed before packaging; no real account data was accessed. This does not establish every multi-monitor or macOS-version combination.
 
 All 98 local tests passed, including the isolated signed-out official CLI test.
+
+## 0.4.7 desktop CLI compatibility
+
+All 103 local tests passed with zero failures or skips: 74 app tests and 29 core tests. The opt-in signed-out smoke test resolved the executable from the installed desktop bundle and verified initialization, empty account state and file-storage configuration in an isolated directory. The tested official desktop was version 26.1002.52244 (build 13536), with CLI 0.162.0-alpha.2.
+
+New regressions cover both executable layouts, an in-place layout change without path caching, unsupported bundles, missing/non-executable/directory entries, refresh using the packaged layout, retained quota caches on compatibility errors, and recovery without reimporting credentials. Compatibility failures do not trigger a login pause or Keychain access.
+
+A separate read-only probe queried the current account through the installed official CLI in an isolated directory and received a usable quota window. It provided only the access token in external-token mode; no isolated auth file was written, no refresh token was renewed, and the live credential file was unchanged. This verifies one current-account query, not long-running automatic refresh, expired-account recovery or desktop switching. No account identifiers, credentials or real quota values are included in this record.

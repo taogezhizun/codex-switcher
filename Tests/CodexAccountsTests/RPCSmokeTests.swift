@@ -4,14 +4,20 @@ import AccountsCore
 
 final class RPCSmokeTests: XCTestCase {
     @MainActor func testRealCLIInEmptyIsolatedHome() async throws {
-        guard let path = ProcessInfo.processInfo.environment["CODEX_ACCOUNTS_TEST_CLI"] else {
-            throw XCTSkip("Set CODEX_ACCOUNTS_TEST_CLI to a trusted local Codex executable for the opt-in smoke test.")
+        let environment = ProcessInfo.processInfo.environment
+        let executable: URL
+        if let app = environment["CODEX_ACCOUNTS_TEST_APP"] {
+            executable = try Desktop.resolveExecutable(in: URL(fileURLWithPath: app))
+        } else if let path = environment["CODEX_ACCOUNTS_TEST_CLI"] {
+            executable = URL(fileURLWithPath: path)
+        } else {
+            throw XCTSkip("Set CODEX_ACCOUNTS_TEST_APP or CODEX_ACCOUNTS_TEST_CLI to a trusted local Codex installation for the opt-in smoke test.")
         }
         let root = (try PrivateFiles.canonicalDirectory(FileManager.default.temporaryDirectory)).appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let session = try IsolatedSession(root: root)
         do {
-            try await session.rpc.start(executable: URL(fileURLWithPath: path), home: session.home)
+            try await session.rpc.start(executable: executable, home: session.home)
             let account = try await session.rpc.request("account/read", ["refreshToken": false])
             XCTAssertTrue(account["account"] is NSNull)
             let response = try await session.rpc.request("config/read", ["includeLayers": false])

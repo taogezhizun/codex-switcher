@@ -38,7 +38,7 @@ import AccountsCore
         let probe = QueryProbe()
         var model: AppModel!
         var ids: [String] = []
-        init(legacy: Bool = false) throws {
+        init(legacy: Bool = false, cliEntry: String = "Contents/Resources/codex") throws {
             storage = try StoreFixture(); defaults = UserDefaults(suiteName: suite)!
             let home = storage.root.appendingPathComponent("home")
             try PrivateFiles.write(syntheticAuth("a", token: "fresh-live-token"), to: home.appendingPathComponent("auth.json"))
@@ -55,7 +55,7 @@ import AccountsCore
             // Only the injected reader runs; this fake bundle satisfies metadata preflight without a real app.
             let app = storage.root.appendingPathComponent("Synthetic.app")
             try PrivateFiles.write(PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": "com.openai.codex"], format: .xml, options: 0), to: app.appendingPathComponent("Contents/Info.plist"))
-            let executable = app.appendingPathComponent("Contents/Resources/codex")
+            let executable = app.appendingPathComponent(cliEntry)
             try PrivateFiles.write(Data("never execute this fixture".utf8), to: executable)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
             defaults.set(home.path, forKey: "codexHome"); defaults.set(app.path, forKey: "desktopApplication")
@@ -87,6 +87,32 @@ import AccountsCore
         XCTAssertEqual(f.model.currentIdentity, f.ids[0])
         XCTAssertEqual(try PrivateFiles.read(f.model.home.appendingPathComponent("auth.json")), original)
         XCTAssertTrue(f.storage.reads.isEmpty)
+    }
+    func testPackagedDesktopCLIRefreshesAllAccounts() async throws {
+        let f = try Fixture(cliEntry: "Contents/Resources/codex-cli/bin/codex"); defer { f.close() }
+        f.model.refreshAll(); await f.finish()
+        XCTAssertEqual(Set(f.probe.started), Set(f.ids))
+        XCTAssertTrue(f.model.accounts.allSatisfy { $0.quotas.first?.remaining == 74 && $0.issue == nil })
+        XCTAssertTrue(f.storage.reads.isEmpty)
+    }
+    func testMissingDesktopCLIPreservesCacheAndReportsCompatibilityWithoutLoginPause() async throws {
+        let f = try Fixture(); defer { f.close() }
+        let app = f.storage.root.appendingPathComponent("Synthetic.app")
+        try FileManager.default.removeItem(at: app.appendingPathComponent("Contents/Resources/codex"))
+        f.model.refreshAll(); await f.finish()
+        XCTAssertTrue(f.probe.started.isEmpty)
+        XCTAssertTrue(f.model.accounts.allSatisfy {
+            $0.quotas.first?.remaining == 10 && $0.updatedAt == Date(timeIntervalSince1970: 1000)
+                && $0.quotaNeedsLogin == false && $0.quotaRejectedFingerprint == nil
+                && $0.issue == DesktopCompatibilityError.missingCLI.localizedDescription
+        })
+        // A newly installed compatible desktop can be retried without reimporting credentials.
+        let cli = app.appendingPathComponent("Contents/Resources/codex-cli/bin/codex")
+        try PrivateFiles.write(Data("never execute this fixture".utf8), to: cli)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: cli.path)
+        f.model.refreshAll(); await f.finish()
+        XCTAssertEqual(Set(f.probe.started), Set(f.ids))
+        XCTAssertTrue(f.model.accounts.allSatisfy { $0.issue == nil })
     }
     func testSingleAccountFailureKeepsItsCacheWhileOthersUpdate() async throws {
         let f = try Fixture(); defer { f.close() }

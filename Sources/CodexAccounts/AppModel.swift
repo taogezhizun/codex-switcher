@@ -284,9 +284,13 @@ import AccountsCore
             if let index = store.accounts.firstIndex(where: { $0.id == id }) {
                 store.accounts[index].quotaNeedsLogin = needsLogin
                 store.accounts[index].quotaRejectedFingerprint = needsLogin ? fingerprint : nil
-                store.accounts[index].issue = needsLogin
-                    ? "登录凭据已过期或失效，自动刷新已暂停。请通过浏览器重新添加此账号；当前账号也可在 Codex 登录后保存。"
-                    : "刷新未完成，保留上次额度并稍后重试。可检查网络；持续失败时请重新登录此账号。"
+                if let compatibility = error as? DesktopCompatibilityError {
+                    store.accounts[index].issue = compatibility.localizedDescription
+                } else {
+                    store.accounts[index].issue = needsLogin
+                        ? "登录凭据已过期或失效，自动刷新已暂停。请通过浏览器重新添加此账号；当前账号也可在 Codex 登录后保存。"
+                        : "刷新未完成，保留上次额度并稍后重试。可检查网络；持续失败时请重新登录此账号。"
+                }
                 do { try store.save() } catch { self.error = "无法保存额度状态，请检查本地文件权限。" }
                 sync()
             }
@@ -440,6 +444,7 @@ import AccountsCore
         } catch { self.error = safeMessage(error) }
     }
     private func safeMessage(_ error: Error) -> String {
+        if let compatibility = error as? DesktopCompatibilityError { return compatibility.localizedDescription }
         if let known = error as? AccountsError { return known.localizedDescription }
         return "本地操作失败，请检查应用设置、文件权限；迁移旧数据时还需允许钥匙串访问。"
     }

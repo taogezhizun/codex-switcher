@@ -3,6 +3,20 @@ import AccountsCore
 import Foundation
 import Darwin
 
+enum DesktopCompatibilityError: Error, LocalizedError {
+    case unsupportedApplication
+    case missingCLI
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedApplication:
+            return "所选应用不是 Codex 桌面 App。请在设置中重新选择。"
+        case .missingCLI:
+            return "未找到 Codex 桌面 App 的内置程序，可能是桌面版更新后布局发生变化。请更新 Codex Switcher 或在设置中重新选择 Codex App；无需重新登录账号。"
+        }
+    }
+}
+
 @MainActor final class Desktop: SwitchEnvironment {
     static let bundleID = "com.openai.codex"
     let application: URL
@@ -11,7 +25,25 @@ import Darwin
     var phase: (String) -> Void = { _ in }
     var homePath: String { home.path }
     var authURL: URL { home.appendingPathComponent("auth.json") }
-    var executable: URL { application.appendingPathComponent("Contents/Resources/codex") }
+    var executable: URL { get throws { try Self.resolveExecutable(in: application) } }
+
+    /// Resolve on every operation because the desktop may update in place while we are running.
+    static func resolveExecutable(in application: URL) throws -> URL {
+        guard Bundle(url: application)?.bundleIdentifier == bundleID else {
+            throw DesktopCompatibilityError.unsupportedApplication
+        }
+        // Use the official launcher for the packaged CLI; retain support for earlier desktop builds.
+        let entries = ["Contents/Resources/codex-cli/bin/codex", "Contents/Resources/codex"]
+        for entry in entries {
+            let url = application.appendingPathComponent(entry)
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+               !isDirectory.boolValue, FileManager.default.isExecutableFile(atPath: url.path) {
+                return url
+            }
+        }
+        throw DesktopCompatibilityError.missingCLI
+    }
 
     static func discover() -> URL? {
         if let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.bundleURL { return running }
@@ -21,10 +53,7 @@ import Darwin
         self.application = application; self.home = home; self.store = store
     }
     func preflight() throws {
-        guard Bundle(url: application)?.bundleIdentifier == Self.bundleID,
-              FileManager.default.isExecutableFile(atPath: executable.path) else {
-            throw AccountsError.message("所选应用不是支持的 Codex 桌面 App，或缺少内置 Codex 程序。")
-        }
+        _ = try executable
         try PrivateFiles.rejectSymlinks(home)
         let text = try PrivateFiles.read(home.appendingPathComponent("config.toml"))
         if let text {
