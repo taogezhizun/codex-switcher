@@ -56,7 +56,9 @@ struct AccountsView: View {
             }
             VStack(spacing: 0) {
                 if model.needsMigration { MigrationBanner().padding([.top, .horizontal], 24) }
-                if model.awaitingConfirmation {
+                if let prompt = model.shutdownPrompt {
+                    ShutdownConfirmationView(prompt: prompt).padding([.top, .horizontal], 24)
+                } else if model.awaitingConfirmation && !model.busy {
                     RecoveryBanner { showRestore = true }.padding([.top, .horizontal], 24)
                 }
                 if let error = model.error {

@@ -1,7 +1,6 @@
 import AppKit
 import AccountsCore
 import Foundation
-import Darwin
 
 enum DesktopCompatibilityError: Error, LocalizedError {
     case unsupportedApplication
@@ -23,6 +22,9 @@ enum DesktopCompatibilityError: Error, LocalizedError {
     let home: URL
     let store: AccountStore
     var phase: (String) -> Void = { _ in }
+    var confirmTermination: (DesktopShutdownPrompt) async -> Bool = { _ in false }
+    var terminationAlreadyApproved = false
+    private var shutdown: DesktopShutdown?
     var homePath: String { home.path }
     var authURL: URL { home.appendingPathComponent("auth.json") }
     var executable: URL { get throws { try Self.resolveExecutable(in: application) } }
@@ -71,26 +73,20 @@ enum DesktopCompatibilityError: Error, LocalizedError {
         }
     }
     func stopDesktop() async throws {
-        phase("正在正常退出桌面 App…")
         let apps = NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID)
-        let children = try childCodexProcesses(of: apps.map(\.processIdentifier))
-        for app in apps {
-            if !app.terminate() { throw AccountsError.message("桌面 App 未接受退出请求，请手动退出后重试。") }
+        let selected = application.resolvingSymlinksInPath()
+        guard apps.allSatisfy({ $0.bundleURL?.resolvingSymlinksInPath() == selected }),
+              let main = Bundle(url: selected)?.executableURL?.resolvingSymlinksInPath().path else {
+            throw AccountsError.message("正在运行的 Codex 与所选应用不一致。请退出其他副本或在设置中重新选择。")
         }
-        for _ in 0..<150 {
-            if apps.allSatisfy(\.isTerminated) { break }
-            try await Task.sleep(nanoseconds: 100_000_000)
-        }
-        guard apps.allSatisfy(\.isTerminated) else {
-            throw AccountsError.message("桌面 App 尚未退出。原认证未更改，请处理 App 中的退出提示后重试。")
-        }
-        for _ in 0..<80 {
-            if children.allSatisfy({ kill($0, 0) != 0 }) { break }
-            try await Task.sleep(nanoseconds: 100_000_000)
-        }
-        guard children.allSatisfy({ kill($0, 0) != 0 }) else {
-            throw AccountsError.message("桌面 App 的后台进程仍在运行。原认证未更改，请等待进程正常退出。")
-        }
+        let cliPaths = ["Contents/Resources/codex", "Contents/Resources/codex-cli/bin/codex",
+                        "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"]
+        let shutdown = DesktopShutdown(mainExecutable: main,
+            cliExecutables: Set(cliPaths.map { selected.appendingPathComponent($0).resolvingSymlinksInPath().path }),
+            readProcesses: { try SystemDesktopProcesses.snapshot(matchingExecutableNames: [URL(fileURLWithPath: main).lastPathComponent, "codex"]) },
+            requestQuit: { apps.forEach { _ = $0.terminate() } }, sendSignal: SystemDesktopProcesses.signal)
+        self.shutdown = shutdown
+        try await shutdown.stop(terminationAlreadyApproved: terminationAlreadyApproved, confirm: confirmTermination, phase: phase)
         try preflight() // A daemon may have appeared while the desktop was closing.
     }
     func startDesktop() async throws {
@@ -101,31 +97,16 @@ enum DesktopCompatibilityError: Error, LocalizedError {
     }
     func readLive() throws -> Data? { try PrivateFiles.read(authURL) }
     func writeLive(_ data: Data?) throws {
+        guard let shutdown else { throw AccountsError.message("尚未确认 Codex 已退出，已停止写入认证。") }
+        try preflight()
+        guard NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID).allSatisfy(\.isTerminated) else {
+            throw AccountsError.message("Codex 已重新启动，已停止写入认证。请退出后重试；已有备份会保留。")
+        }
+        try shutdown.verifyStopped() // Covers switching, recovery and rollback after a failed launch.
         phase("正在更新认证…")
         if let data { try PrivateFiles.write(data, to: authURL) } else { try PrivateFiles.remove(authURL) }
     }
     func saveBackup(_ backup: SwitchBackup) throws { try store.saveBackup(backup) }
     func archiveDeparting(_ data: Data) throws { _ = try store.upsert(data) }
 
-    private func childCodexProcesses(of parents: [pid_t]) throws -> [pid_t] {
-        let proc = Process(); let pipe = Pipe()
-        proc.executableURL = URL(fileURLWithPath: "/bin/ps")
-        proc.arguments = ["-axo", "pid=,ppid=,comm="]
-        proc.standardOutput = pipe; proc.standardError = FileHandle.nullDevice
-        try proc.run()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile(); proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else { throw AccountsError.message("无法检查桌面后台进程，已停止切换。") }
-        let rows = String(decoding: data, as: UTF8.self).split(separator: "\n").compactMap { line -> (pid_t, pid_t, String)? in
-            let fields = line.split(maxSplits: 2, whereSeparator: { $0 == " " || $0 == "\t" })
-            guard fields.count == 3, let pid = Int32(fields[0]), let parent = Int32(fields[1]) else { return nil }
-            return (pid, parent, String(fields[2]))
-        }
-        var descendants = Set(parents)
-        for _ in 0..<20 {
-            let before = descendants.count
-            for row in rows where descendants.contains(row.1) { descendants.insert(row.0) }
-            if descendants.count == before { break }
-        }
-        return rows.filter { descendants.contains($0.0) && $0.2.hasPrefix(application.path + "/Contents/Resources/codex") }.map { $0.0 }
-    }
 }

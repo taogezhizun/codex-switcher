@@ -6,9 +6,10 @@ struct RestartSheet: View {
     @Environment(\.dismiss) private var dismiss
     let target: Account?
     var body: some View {
-        SwitchConfirmation(target: target, compact: false, cancel: { dismiss() }) {
+        SwitchConfirmation(target: target, compact: false, cancel: { dismiss() }) { terminateImmediately in
             dismiss()
-            if let target { model.switchTo(target.id) } else { model.restore() }
+            if let target { model.switchTo(target.id, terminateImmediately: terminateImmediately) }
+            else { model.restore(terminateImmediately: terminateImmediately) }
         }.padding(28).frame(width: 480)
     }
 }
@@ -18,8 +19,11 @@ struct SwitchConfirmation: View {
     let target: Account?
     var compact = false
     let cancel: () -> Void
-    let perform: () -> Void
+    let perform: (_ terminateImmediately: Bool) -> Void
     @State private var ready = false
+    private var actionsDisabled: Bool {
+        !ready || model.busy || model.demo || (target.map { model.switchBlockReason($0.id) != nil } ?? false)
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 18 : 22) {
             HStack(spacing: 11) {
@@ -61,12 +65,43 @@ struct SwitchConfirmation: View {
             HStack(spacing: 10) {
                 Button("取消", action: cancel).keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(target == nil ? "恢复并重开" : "切换并重开", action: perform)
+                Button(target == nil ? "恢复并重开" : "切换并重开") { perform(false) }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(!ready || model.busy || model.demo || (target.map { model.switchBlockReason($0.id) != nil } ?? false))
+                    .disabled(actionsDisabled)
             }.controlSize(.large)
-            Label("退出失败时不会强制结束进程", systemImage: "checkmark.shield").font(.system(size: 10)).foregroundStyle(.secondary)
+            Divider()
+            VStack(alignment: .leading, spacing: 8) {
+                Button(role: .destructive) { perform(true) } label: {
+                    Text(target == nil ? "结束 Codex 并恢复" : "结束 Codex 并切换").frame(maxWidth: .infinity)
+                }.buttonStyle(.bordered).controlSize(.large).disabled(actionsDisabled)
+                Text("跳过正常退出等待，直接结束当前 Codex 及已确认的后台进程；仍无响应时强制结束。未完成任务会中断。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+}
+
+struct ShutdownConfirmationView: View {
+    @EnvironmentObject var model: AppModel
+    let prompt: DesktopShutdownPrompt
+    @State private var ready = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(prompt.title, systemImage: "exclamationmark.triangle").font(.headline)
+            Text(prompt.mainAppRunning
+                 ? "请先查看 Codex 是否正在等待退出确认。若仍无法退出，可以结束该实例后继续切换。"
+                 : "Codex 主程序已退出，但本次检测到的后台程序仍在运行，可以结束残留进程后继续。")
+                .font(.callout).fixedSize(horizontal: false, vertical: true)
+            Text("已确认 \(prompt.processCount) 个相关进程。继续会先请求结束，仍无响应时强制结束，未完成的任务会中断。原登录凭据尚未更改。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Toggle("任务已保存，允许结束这些进程", isOn: $ready).toggleStyle(.checkbox).font(.callout)
+            HStack {
+                Button("取消切换") { model.answerShutdown(terminate: false) }.keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("结束进程并继续", role: .destructive) { model.answerShutdown(terminate: true) }
+                    .disabled(!ready || model.demo)
+            }
+        }.padding(18).background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

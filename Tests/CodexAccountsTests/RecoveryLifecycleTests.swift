@@ -84,13 +84,29 @@ import AccountsCore
         f.f.denied = nil; f.model.migrateAccounts(); await f.finish()
         XCTAssertFalse(f.model.needsMigration)
     }
-    func testFailedSwitchLeavesRecoveryGuardAndNeverTouchesKeychain() async throws {
+    func testFailedSwitchBeforeBackupReloadsJournalWithoutLeavingRecoveryGuard() async throws {
         let f = try ModelFixture(pending: false); defer { f.close() }
         f.model.switchTo(f.other.id); await f.finish()
-        XCTAssertTrue(f.model.awaitingConfirmation); XCTAssertTrue(f.model.recoveryNeedsUnlock)
-        XCTAssertNotNil(f.model.error); XCTAssertTrue(f.f.reads.isEmpty)
-        f.model.unlockRecoveryRecord()
         XCTAssertFalse(f.model.awaitingConfirmation); XCTAssertFalse(f.model.recoveryNeedsUnlock)
+        XCTAssertTrue(f.model.hasBackup)
+        XCTAssertNotNil(f.model.error); XCTAssertTrue(f.f.reads.isEmpty)
+        XCTAssertNil(f.model.switchBlockReason(f.other.id))
+    }
+    func testFailedRestoreKeepsExistingPendingBackupWithoutRequiringManualUnlock() async throws {
+        let f = try ModelFixture(pending: true); defer { f.close() }
+        f.model.restore(); await f.finish()
+        XCTAssertTrue(f.model.awaitingConfirmation); XCTAssertTrue(f.model.hasBackup)
+        XCTAssertFalse(f.model.recoveryNeedsUnlock)
+        XCTAssertNotNil(f.model.error); XCTAssertTrue(f.f.reads.isEmpty)
+    }
+    func testFailedSwitchWithNoBackupAllowsRetryAndPreservesLiveCredential() async throws {
+        let f = try ModelFixture(); defer { f.close() }
+        let before = try PrivateFiles.read(f.model.home.appendingPathComponent("auth.json"))
+        f.model.switchTo(f.other.id); await f.finish()
+        XCTAssertFalse(f.model.awaitingConfirmation); XCTAssertFalse(f.model.hasBackup)
+        XCTAssertFalse(f.model.recoveryNeedsUnlock)
+        XCTAssertEqual(try PrivateFiles.read(f.model.home.appendingPathComponent("auth.json")), before)
+        XCTAssertNil(f.model.switchBlockReason(f.other.id))
     }
     func testLogoutAndUnsavedIdentityRemoveCurrentAccountAndPercentage() throws {
         let f = try ModelFixture(); defer { f.close() }

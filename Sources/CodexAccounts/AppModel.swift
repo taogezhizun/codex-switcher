@@ -38,6 +38,8 @@ import AccountsCore
     @Published var status = "从添加一个账号开始。"
     @Published var error: String?
     @Published var loginCode: String?
+    @Published private(set) var shutdownPrompt: DesktopShutdownPrompt?
+    private var shutdownDecision: CheckedContinuation<Bool, Never>?
     @Published private(set) var recoveryNeedsUnlock = false
     @Published var hasBackup = false
     @Published var awaitingConfirmation = false
@@ -215,6 +217,7 @@ import AccountsCore
         }
     }
     func cancel() {
+        answerShutdown(terminate: false)
         operation?.cancel()
         if let session { Task { await session.rpc.close() } }
         quotaReaders.values.forEach { $0.cancel() }
@@ -299,7 +302,7 @@ import AccountsCore
             return false
         }
     }
-    func switchTo(_ id: String) {
+    func switchTo(_ id: String, terminateImmediately: Bool = false) {
         guard !demo else { return }
         if let reason = switchBlockReason(id) { error = reason; return }
         run("正在检查切换条件…") {
@@ -309,20 +312,32 @@ import AccountsCore
             _ = try self.loadRecoveryState()
             if self.awaitingConfirmation { throw AccountsError.message("请先核对或恢复上次切换，再进行下一次切换。") }
             let target = try store.snapshot(id)
-            let desktop = try self.desktop()
+            let desktop = try self.desktop(terminateImmediately: terminateImmediately)
             self.invalidateRecoveryState()
-            _ = try await SwitchTransaction.run(target: target, environment: desktop)
+            do { _ = try await SwitchTransaction.run(target: target, environment: desktop) }
+            catch {
+                // File-backed journal reads are safe here. A failed quit wrote no journal;
+                // a failure after backup must preserve the durable pending recovery guard.
+                _ = try? self.loadRecoveryState()
+                self.refreshFileIdentity(); self.sync()
+                throw error
+            }
             self.awaitingConfirmation = true; self.hasBackup = true; self.recoveryNeedsUnlock = false
             self.refreshFileIdentity(); self.sync()
             self.status = "认证已更新，桌面 App 已重开。请在 App 中核对账号；当前还未确认桌面登录成功。"
         }
     }
-    func restore() {
+    func restore(terminateImmediately: Bool = false) {
         guard allowCredentialAction() else { return }
         run("正在准备恢复…") {
             guard let backup = try self.loadRecoveryState() else { throw AccountsError.message("没有可恢复的备份。") }
             self.invalidateRecoveryState()
-            try await SwitchTransaction.restore(backup, environment: self.desktop())
+            do { try await SwitchTransaction.restore(backup, environment: self.desktop(terminateImmediately: terminateImmediately)) }
+            catch {
+                _ = try? self.loadRecoveryState()
+                self.refreshFileIdentity(); self.sync()
+                throw error
+            }
             self.awaitingConfirmation = true; self.hasBackup = true; self.recoveryNeedsUnlock = false
             self.refreshFileIdentity(); self.sync()
             self.status = "原认证已恢复，桌面 App 已重开。请核对账号。"
@@ -369,11 +384,28 @@ import AccountsCore
         let account = try store.upsert(data); sync(); selection = account.id
         refreshSchedule.request(account.id, now: Date())
     }
-    private func desktop() throws -> Desktop {
+    private func desktop(terminateImmediately: Bool = false) throws -> Desktop {
         guard let application, let store else { throw AccountsError.message("请先在设置中选择 Codex 桌面 App。") }
         let desktop = Desktop(application: application, home: home, store: store)
+        desktop.terminationAlreadyApproved = terminateImmediately
         desktop.phase = { [weak self] in self?.status = $0 }
+        desktop.confirmTermination = { [weak self] prompt in
+            guard let self else { return false }
+            return await self.confirmShutdown(prompt)
+        }
         return desktop
+    }
+    private func confirmShutdown(_ prompt: DesktopShutdownPrompt) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        return await withCheckedContinuation { continuation in
+            shutdownDecision = continuation
+            shutdownPrompt = prompt
+        }
+    }
+    func answerShutdown(terminate: Bool) {
+        let decision = shutdownDecision
+        shutdownDecision = nil; shutdownPrompt = nil
+        decision?.resume(returning: terminate)
     }
     private func makeSession() throws -> IsolatedSession {
         guard let store else { throw AccountsError.message("本地账号库未就绪。") }

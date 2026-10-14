@@ -16,7 +16,7 @@ A native macOS menu bar utility for managing your own Codex desktop accounts.
 - **See your active account's remaining usage** in the menu bar.
 - **Update in place** through the app's signed update channel.
 
-**Version 0.4.7:** Fixes usage refresh after the official Codex desktop app moved its bundled CLI. Both new and earlier layouts are supported, and compatibility problems now show a clear message instead of a network/login hint. Existing accounts, settings and update URLs are preserved. The repository URL and legacy installer filenames remain unchanged for compatibility.
+**Version 0.4.8:** Handles Codex processes that remain after quitting. The initial confirmation offers a direct terminate-and-switch action, and normal quit timeouts offer the same explicit fallback. Only processes identified as belonging to this attempt may be terminated; credentials are written only after exit is verified. Failures before writing credentials can be retried directly. Termination interrupts unfinished work, so pause your tasks first. Existing accounts, settings and update URLs are preserved. The repository URL and legacy installer filenames remain unchanged for compatibility.
 
 ## Get started
 

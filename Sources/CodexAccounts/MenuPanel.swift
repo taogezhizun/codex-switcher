@@ -13,10 +13,13 @@ struct MenuPanel: View {
     var accounts: [Account] { AccountPresentation.ordered(model.accounts, current: model.currentIdentity, query: query) }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if pending != nil || recovering {
-                SwitchConfirmation(target: pending, compact: true, cancel: { pending = nil; recovering = false }) {
+            if let prompt = model.shutdownPrompt {
+                ShutdownConfirmationView(prompt: prompt).padding(14)
+            } else if pending != nil || recovering {
+                SwitchConfirmation(target: pending, compact: true, cancel: { pending = nil; recovering = false }) { terminateImmediately in
                     let target = pending; pending = nil; recovering = false
-                    if let target { model.switchTo(target.id) } else { model.restore() }
+                    if let target { model.switchTo(target.id, terminateImmediately: terminateImmediately) }
+                    else { model.restore(terminateImmediately: terminateImmediately) }
                 }.padding(20)
             } else {
                 HStack(spacing: 10) {
@@ -28,7 +31,7 @@ struct MenuPanel: View {
                 }.padding(18)
                 if let error = model.error { ErrorBanner(message: error) { model.error = nil }.padding([.horizontal, .bottom], 14) }
                 if model.needsMigration { MigrationBanner().padding([.horizontal, .bottom], 14) }
-                if model.awaitingConfirmation {
+                if model.awaitingConfirmation && !model.busy {
                     VStack(alignment: .leading, spacing: 9) {
                         Label(model.recoveryNeedsUnlock ? "恢复记录需要检查" : "请先核对上次切换", systemImage: "clock.badge.checkmark").font(.callout.weight(.medium))
                         Text(model.recoveryNeedsUnlock ? "重新检查本地恢复记录。" : "检查桌面 App 的账号，确认后才能继续切换。").font(.caption).foregroundStyle(.secondary)
